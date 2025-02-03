@@ -1,3 +1,4 @@
+---WIP fixing code to save resizing of the frame
 -- Addon name and namespace
 local addonName, addonNamespace = ...
 
@@ -9,15 +10,25 @@ function InitializeSettings()
     RaidLockoutDB.sliders = RaidLockoutDB.sliders or {50, 80, 50}
     RaidLockoutDB.checkboxes = RaidLockoutDB.checkboxes or {true, true, true, false, false}
     RaidLockoutDB.position = RaidLockoutDB.position or {point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", xOfs = 20, yOfs = 0}
-    RaidLockoutDB.frameSize = RaidLockoutDB.frameSize or {width = 250, height = 100}
+    RaidLockoutDB.frameSize = RaidLockoutDB.frameSize or {width = 300, height = 300}
     RaidLockoutDB.updateLayout = RaidLockoutDB.updateLayout or false
     RaidLockoutDB.alpha = RaidLockoutDB.alpha or 100
     RaidLockoutDB.scale = RaidLockoutDB.scale or 100
 end
 
+-- Initialize settings before creating the frame
+InitializeSettings()
+
 -- Create the main frame
 local frame = CreateFrame("Frame", "RaidLockOutFrame", UIParent, "BackdropTemplate")
-frame:SetSize(300, 300)  -- Initial size (will be dynamically resized later)
+frame:SetSize(RaidLockoutDB.frameSize.width or 300, RaidLockoutDB.frameSize.height or 300)  -- Initial size (will be dynamically resized later)
+
+-- Clear existing anchors before setting a new one
+frame:ClearAllPoints()
+
+-- Set the new point
+frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)  -- Adjust the point and offsets as needed
+
 frame:SetBackdrop({
     bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -33,13 +44,7 @@ frame:SetResizable(true) -- Make the frame resizable
 frame:EnableMouse(true)
 frame:RegisterForDrag("LeftButton")
 frame:SetScript("OnDragStart", frame.StartMoving)
-frame:SetScript("OnDragStop", function(self)
-    self:StopMovingOrSizing()
-    local point, relativeTo, relativePoint, xOfs, yOfs = self:GetPoint()
-    RaidLockoutDB.position = {point = point, relativeTo = relativeTo and relativeTo:GetName() or "UIParent", relativePoint = relativePoint, xOfs = xOfs, yOfs = yOfs}
-    self:ClearAllPoints()
-    self:SetPoint(point, relativeTo, relativePoint, xOfs, yOfs)
-end)
+-- This function is already defined later in the code, so it can be removed here.
 frame:Hide()
 
 -- Create a close texture
@@ -59,7 +64,7 @@ end)
 closeTexture:SetScript("OnMouseUp", function(self, button)
     if button == "LeftButton" then
         local point, relativeTo, relativePoint, xOfs, yOfs = frame:GetPoint()
-        RaidLockoutDB.position = {point = point, relativeTo = relativeTo and relativeTo:GetName() or "UIParent", relativePoint = relativePoint, xOfs = xOfs, yOfs = yOfs}
+        RaidLockoutDB.position = {point = point, relativeTo = relativeTo and relativeTo:GetName() or "UIParent", relativePoint = relativePoint, xOfs = xOfs, yOfs}
         frame:Hide()
     end
 end)
@@ -92,7 +97,7 @@ settingsTitle:SetText("|cff00ff00Settings|r")
 
 -- Add a settings texture to the main frame
 local settingsTexture = frame:CreateTexture(nil, "ARTWORK")
-settingsTexture:SetSize(24, 24)
+settingsTexture:SetSize(24, 20)
 settingsTexture:SetPoint("TOPLEFT", frame, "TOPLEFT", 5, -5)
 settingsTexture:SetTexture("Interface\\AddOns\\RaidLockouts\\settings.png")
 settingsTexture:SetTexCoord(0, 1, 0, 1)
@@ -194,10 +199,18 @@ resizeTexture:SetScript("OnLeave", function(self)
     self:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
 end)
 
+-- Ensure the frame size is saved when resizing stops
+frame:SetScript("OnSizeChanged", function(self, width, height)
+    RaidLockoutDB.frameSize = {width = width, height = height}
+end)
+
+-- Set minimum and maximum sizes for the frame
+frame:SetResizeBounds(200, 100, 800, 600)
+
 -- Title text
 local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
 title:SetPoint("TOP", frame, "TOP", 0, -10)
-title:SetText("|cFFFF7D0ARaid|r and |cFFFFFFFFDungeon|r Lockouts")
+title:SetText("|cFFABD473Raid|r and |cFF69CCF0Dungeon|r Lockouts")
 
 -- Content text
 local content = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -237,8 +250,11 @@ local function GetRaidColor(name)
         return "|cFF00FF00" -- Green
     elseif name:lower():find("naxxramas") then
         return "|cFF0070DD" -- Blue
+    else
+        -- Randomize light color for other raids
+        local colors = {"|cFFFFA07A", "|cFF98FB98", "|cFFADD8E6", "|cFFFFFFE0", "|cFFFFB6C1", "|cFFE0FFFF"}
+        return colors[math.random(#colors)]
     end
-    return "|cFFFFFFFF" -- White for other raids
 end
 
 -- Function to update lockouts
@@ -274,12 +290,12 @@ local function UpdateLockouts()
             local raidColor = GetRaidColor(name or "Unknown Instance")
 
             local lockoutText = string.format(
-                "%s%s (%s)\n%s\nResets on |cFFFFFFFF%s|r\n",
+                "%s%s (%s) - |cFFFF0000%s|r\n%s\n",
                 raidColor,
                 name or "Unknown Instance",
                 difficultyName,
-                resetFormatted,
-                resetDay
+                resetDay,
+                resetFormatted
             )
 
             if IsRetail() and (difficulty == 1 or difficulty == 2) then
@@ -337,7 +353,9 @@ end
 -- Restore frame position on load
 if RaidLockoutDB.position.userMoved then
     local relativeTo = _G[RaidLockoutDB.position.relativeTo] or UIParent
+    frame:ClearAllPoints()
     frame:SetPoint(RaidLockoutDB.position.point, relativeTo, RaidLockoutDB.position.relativePoint, RaidLockoutDB.position.xOfs, RaidLockoutDB.position.yOfs)
+    frame:SetSize(RaidLockoutDB.frameSize.width, RaidLockoutDB.frameSize.height)
 else
     AnchorToCharacterPanel()
 end
@@ -346,19 +364,32 @@ end
 frame:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
     local point, relativeTo, relativePoint, xOfs, yOfs = self:GetPoint()
-    RaidLockoutDB.position = {point = point, relativeTo = relativeTo and relativeTo:GetName() or "UIParent", relativePoint = relativePoint, xOfs = xOfs, yOfs = yOfs, userMoved = true}
+    RaidLockoutDB.position = {point = point, relativeTo = relativeTo and relativeTo:GetName() or "UIParent", relativePoint = relativePoint, xOfs = xOfs, yOfs, userMoved = true}
     self:ClearAllPoints()
     self:SetPoint(point, relativeTo, relativePoint, xOfs, yOfs)
 end)
 
+-- Function to reset the frame to the center of the screen
+local function ResetFramePosition()
+    RaidLockOutFrame:ClearAllPoints()
+    RaidLockOutFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    RaidLockoutDB.position = {point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", xOfs = 0, yOfs = 0, userMoved = true}
+end
+
 -- Slash command to show/hide the frame
-SLASH_RAIDLOCKOUTS1 = "/lockouts"
-SlashCmdList["RAIDLOCKOUTS"] = function()
-    if frame:IsShown() then
-        frame:Hide()
+SLASH_RAIDLOCKOUTS1 = "/raidlockouts"
+SlashCmdList["RAIDLOCKOUTS"] = function(msg)
+    if msg == "show" then
+        RaidLockOutFrame:Show()
+    elseif msg == "hide" then
+        RaidLockOutFrame:Hide()
+    elseif msg == "reset" then
+        ResetFramePosition()
     else
-        AnchorToCharacterPanel() -- Ensure it reanchors
-        frame:Show()
+        print("Usage:")
+        print("/raidlockouts show - Show the frame")
+        print("/raidlockouts hide - Hide the frame")
+        print("/raidlockouts reset - Reset the frame position")
     end
 end
 
@@ -372,6 +403,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         InitializeSettings()
         -- Restore frame position, alpha, and scale on load
         local relativeTo = _G[RaidLockoutDB.position.relativeTo] or UIParent
+        frame:ClearAllPoints()
         frame:SetPoint(RaidLockoutDB.position.point, relativeTo, RaidLockoutDB.position.relativePoint, RaidLockoutDB.position.xOfs, RaidLockoutDB.position.yOfs)
         frame:SetBackdropColor(0, 0, 0, RaidLockoutDB.alpha / 100)
         frame:SetScale(RaidLockoutDB.scale / 100)
@@ -379,9 +411,8 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_LOGOUT" then
         -- Save the current frame position and size on logout
         local point, relativeTo, relativePoint, xOfs, yOfs = frame:GetPoint()
-        RaidLockoutDB.position = {point = point, relativeTo = relativeTo and relativeTo:GetName() or "UIParent", relativePoint = relativePoint, xOfs = xOfs, yOfs = yOfs}
+        RaidLockoutDB.position = {point = point, relativeTo = relativeTo and relativeTo:GetName() or "UIParent", relativePoint = relativePoint, xOfs = xOfs, yOfs = yOfs, userMoved = true}
         local width, height = frame:GetSize()
         RaidLockoutDB.frameSize = {width = width, height = height}
     end
 end)
-

@@ -2,7 +2,7 @@
 ## Title: RaidLockouts
 ## Author: Pegga
 ## Website: https://github.com/1broccoli
-## Version: 2.0
+## Version: 2.3
 ## Notes: A simple addon that shows raid lockouts
 ## X-Game-Version: Retail, Classic, Wrath
 ## X-WoW-Required-Interface: 11403
