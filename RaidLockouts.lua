@@ -23,6 +23,17 @@ InitializeSettings()
 local frame = CreateFrame("Frame", "RaidLockOutFrame", UIParent, "BackdropTemplate")
 frame:SetSize(RaidLockoutDB.frameSize.width or 300, RaidLockoutDB.frameSize.height or 300)  -- Initial size (will be dynamically resized later)
 
+-- Create a scroll frame
+local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+scrollFrame:SetPoint("TOPLEFT", 10, -40)
+scrollFrame:SetPoint("BOTTOMRIGHT", -35, 20)
+
+
+-- Create a content frame for the scroll frame
+local contentFrame = CreateFrame("Frame", nil, scrollFrame)
+scrollFrame:SetScrollChild(contentFrame)
+contentFrame:SetSize(frame:GetWidth() - 40, frame:GetHeight() - 50)
+
 -- Clear existing anchors before setting a new one
 frame:ClearAllPoints()
 
@@ -199,24 +210,26 @@ resizeTexture:SetScript("OnLeave", function(self)
     self:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
 end)
 
+-- Title text
+local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+title:SetPoint("TOP", frame, "TOP", 0, -10)
+title:SetText("|cFFABD473Instance|r |cFF69CCF0Lockouts|r")
+
+-- Content text
+local content = contentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+content:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 0, 0)
+content:SetWidth(contentFrame:GetWidth())
+content:SetJustifyH("LEFT")
+
 -- Ensure the frame size is saved when resizing stops
 frame:SetScript("OnSizeChanged", function(self, width, height)
     RaidLockoutDB.frameSize = {width = width, height = height}
+    contentFrame:SetSize(width - 40, height - 50)
+    content:SetWidth(contentFrame:GetWidth())
 end)
 
 -- Set minimum and maximum sizes for the frame
 frame:SetResizeBounds(200, 100, 800, 600)
-
--- Title text
-local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-title:SetPoint("TOP", frame, "TOP", 0, -10)
-title:SetText("|cFFABD473Raid|r and |cFF69CCF0Dungeon|r Lockouts")
-
--- Content text
-local content = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-content:SetPoint("TOPLEFT", frame, "TOPLEFT", 15, -40)
-content:SetWidth(370)
-content:SetJustifyH("LEFT")
 
 -- Utility function to determine the client (Classic or Retail)
 local function IsRetail()
@@ -318,8 +331,9 @@ local function UpdateLockouts()
     content:SetText(finalText)
 
     -- Dynamically adjust the frame size based on the content
-    local height = 40 + content:GetStringHeight() + 20 -- Add padding
-    frame:SetSize(400, height)
+    local contentHeight = content:GetStringHeight()
+    contentFrame:SetHeight(contentHeight)
+    scrollFrame:UpdateScrollChildRect()
 end
 
 -- Update lockouts when the frame is shown
@@ -356,6 +370,8 @@ if RaidLockoutDB.position.userMoved then
     frame:ClearAllPoints()
     frame:SetPoint(RaidLockoutDB.position.point, relativeTo, RaidLockoutDB.position.relativePoint, RaidLockoutDB.position.xOfs, RaidLockoutDB.position.yOfs)
     frame:SetSize(RaidLockoutDB.frameSize.width, RaidLockoutDB.frameSize.height)
+    content:SetWidth(RaidLockoutDB.frameSize.width - 30) -- Adjust content width to fit within the frame
+    content:SetHeight(RaidLockoutDB.frameSize.height - 60) -- Adjust content height to fit within the frame
 else
     AnchorToCharacterPanel()
 end
